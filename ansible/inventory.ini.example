@@ -1,5 +1,5 @@
 [servers]
-# Remplace par ton IP / user
+# Première connexion : port 22
 # Exemple:
-# 123.123.123.123 ansible_user=root
-IP_DU_SERVEUR ansible_user=root
+# 123.123.123.123 ansible_user=root ansible_port=22
+IP_DU_SERVEUR ansible_user=root ansible_port=22

@@ -16,6 +16,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set lowercase image name
+        run: |
+          echo "IMAGE_NAME=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')/demo-app" >> $GITHUB_ENV
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -26,11 +30,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set lowercase image name
-        id: vars
-        run: |
-          echo "IMAGE_NAME=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')/demo-app" >> $GITHUB_ENV
-
       - name: Build and push app image
         uses: docker/build-push-action@v6
         with:
@@ -38,16 +37,15 @@ jobs:
           push: true
           tags: ${{ env.IMAGE_NAME }}:${{ github.sha }}
 
-      # SSH key for Ansible -> server
       - name: Start ssh-agent
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Add server to known_hosts
+      - name: Add server to known_hosts (custom port)
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -p "${{ secrets.SSH_PORT }}" -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
 
       - name: Install Ansible + deps
         run: |
@@ -55,11 +53,11 @@ jobs:
           sudo apt-get install -y ansible
           ansible-galaxy collection install community.general
 
-      - name: Generate inventory.ini
+      - name: Generate inventory.ini (with SSH port)
         run: |
           cat > ansible/inventory.ini <<'EOF'
           [servers]
-          ${{ secrets.SSH_HOST }} ansible_user=${{ secrets.SSH_USER }}
+          ${{ secrets.SSH_HOST }} ansible_user=${{ secrets.SSH_USER }} ansible_port=${{ secrets.SSH_PORT }}
           EOF
 
       - name: Generate group_vars/all.yml from GitHub Secrets
@@ -68,6 +66,7 @@ jobs:
           cat > ansible/group_vars/all.yml <<EOF
           app_domain: "${{ secrets.APP_DOMAIN }}"
           letsencrypt_email: "${{ secrets.LETSENCRYPT_EMAIL }}"
+          ssh_port: ${{ secrets.SSH_PORT }}
           app_image: "${{ env.IMAGE_NAME }}:${{ github.sha }}"
           mariadb_root_password: "${{ secrets.MARIADB_ROOT_PASSWORD }}"
           mariadb_database: "${{ secrets.MARIADB_DATABASE }}"
@@ -75,8 +74,8 @@ jobs:
           mariadb_password: "${{ secrets.MARIADB_PASSWORD }}"
           EOF
 
-      # Bootstrap can be heavy; keep it enabled for first runs. Later you can comment it out.
-      - name: Bootstrap server (k3s + cert-manager)
+      # Bootstrap à garder au début. Ensuite, tu peux le commenter pour accélérer les pushes.
+      - name: Bootstrap server (k3s + security + k9s)
         run: |
           cd ansible
           ansible-playbook -i inventory.ini bootstrap.yml

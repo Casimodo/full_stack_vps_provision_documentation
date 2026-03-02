@@ -1,11 +1,13 @@
-# Copie ce fichier vers: ansible/group_vars/all.yml
-# Puis remplis les valeurs (OU utilise GitHub Secrets côté CI)
-
+# Copie vers: ansible/group_vars/all.yml
+# (En CI, ce fichier est généré depuis GitHub Secrets)
 app_domain: "app.ton-domaine.com"
 letsencrypt_email: "toi@email.com"
 
-# Image de l'app (en local) - en CI elle sera définie par le workflow
-app_image: "ghcr.io/OWNER/REPO/demo-app:latest"
+# Port SSH final après hardening (ex: 2022)
+ssh_port: 2022
+
+# Image de l'app (en CI elle est définie par le workflow)
+app_image: "ghcr.io/owner/repo/demo-app:latest"
 
 mariadb_root_password: "change-me"
 mariadb_database: "appdb"

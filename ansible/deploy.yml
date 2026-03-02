@@ -35,33 +35,34 @@
         mode: "0644"
 
     - name: Apply namespace
-      ansible.builtin.shell: kubectl apply -f /root/demo-deploy/k8s/namespace.yaml
+      ansible.builtin.shell: KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f /root/demo-deploy/k8s/namespace.yaml
 
-    - name: Create/Update MariaDB Secret from vars (no clear secrets in repo)
+    - name: Create/Update MariaDB Secret from vars
       ansible.builtin.shell: |
-        kubectl -n demo create secret generic mariadb-secret \
+        KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl -n demo create secret generic mariadb-secret \
           --from-literal=MARIADB_ROOT_PASSWORD='{{ mariadb_root_password }}' \
           --from-literal=MARIADB_DATABASE='{{ mariadb_database }}' \
           --from-literal=MARIADB_USER='{{ mariadb_user }}' \
           --from-literal=MARIADB_PASSWORD='{{ mariadb_password }}' \
-          --dry-run=client -o yaml | kubectl apply -f -
+          --dry-run=client -o yaml | KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f -
 
     - name: Apply MariaDB (StatefulSet + Service)
-      ansible.builtin.shell: kubectl apply -f /root/demo-deploy/k8s/mariadb.yaml
+      ansible.builtin.shell: KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f /root/demo-deploy/k8s/mariadb.yaml
 
     - name: Apply cert-manager issuer (ClusterIssuer)
-      ansible.builtin.shell: kubectl apply -f /root/demo-deploy/k8s/issuer-letsencrypt.yaml
+      ansible.builtin.shell: KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f /root/demo-deploy/k8s/issuer-letsencrypt.yaml
 
     - name: Apply App (Deployment + Service)
-      ansible.builtin.shell: kubectl apply -f /root/demo-deploy/k8s/app.yaml
+      ansible.builtin.shell: KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f /root/demo-deploy/k8s/app.yaml
 
     - name: Apply Ingress (Traefik + TLS)
-      ansible.builtin.shell: kubectl apply -f /root/demo-deploy/k8s/ingress.yaml
+      ansible.builtin.shell: KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f /root/demo-deploy/k8s/ingress.yaml
 
     - name: Show useful commands
       ansible.builtin.debug:
         msg:
           - "Check pods: kubectl -n demo get pods"
           - "Check ingress: kubectl -n demo get ingress"
+          - "k9s: k9s"
           - "App URL: https://{{ app_domain }}/"
           - "DB health: https://{{ app_domain }}/health/db"
