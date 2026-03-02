@@ -4,11 +4,9 @@
   become: true
 
   vars:
-    # Si tu veux forcer un reboot auto en maintenance
     reboot_if_needed: true
 
   tasks:
-    # ---------- System updates ----------
     - name: Update apt cache
       ansible.builtin.apt:
         update_cache: yes
@@ -31,9 +29,6 @@
         reboot_timeout: 900
       when: reboot_if_needed and reboot_required.stat.exists
 
-    # ---------- MariaDB upgrade example ----------
-    # Ici on montre le mécanisme : changer l'image mariadb via variable, appliquer et attendre.
-    # Avec 1 replica DB, il y aura un redémarrage (donc une courte indispo DB).
     - name: Render MariaDB manifest (image injected)
       ansible.builtin.template:
         src: ../k8s/mariadb.yaml

@@ -139,7 +139,7 @@
           x86_64) ARCH=amd64 ;;
           aarch64) ARCH=arm64 ;;
         esac
-        curl -fsSL -o /tmp/k9s.tgz https://github.com/derailed/k9s/releases/download/{{ k9s_version }}/k9s_Linux_${ARCH}.tar.gz
+        curl -fsSL -o /tmp/k9s.tgz https://github.com/derailed/k9s/releases/download/v0.32.4/k9s_Linux_${ARCH}.tar.gz
         tar -xzf /tmp/k9s.tgz -C /tmp k9s
         install -m 0755 /tmp/k9s /usr/local/bin/k9s
       args:

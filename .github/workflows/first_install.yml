@@ -1,4 +1,4 @@
-name: Maintenance
+name: First Install
 
 on:
   workflow_dispatch: {}
@@ -7,7 +7,7 @@ permissions:
   contents: read
 
 jobs:
-  maintenance:
+  first_install:
     runs-on: ubuntu-latest
 
     steps:
@@ -19,10 +19,10 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Add server to known_hosts (custom port)
+      - name: Add server to known_hosts (initial port 22)
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -p "${{ secrets.SSH_PORT }}" -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -p 22 -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
 
       - name: Install Ansible + deps
         run: |
@@ -30,11 +30,11 @@ jobs:
           sudo apt-get install -y ansible
           ansible-galaxy collection install community.general
 
-      - name: Generate inventory.ini (with SSH port)
+      - name: Generate inventory.ini (initial port 22)
         run: |
           cat > ansible/inventory.ini <<'EOF'
           [servers]
-          ${{ secrets.SSH_HOST }} ansible_user=${{ secrets.SSH_USER }} ansible_port=${{ secrets.SSH_PORT }}
+          ${{ secrets.SSH_HOST }} ansible_user=${{ secrets.SSH_USER }} ansible_port=22
           EOF
 
       - name: Generate group_vars/all.yml from GitHub Secrets
@@ -46,14 +46,14 @@ jobs:
           ssh_port: ${{ secrets.SSH_PORT }}
           app_replicas: ${{ secrets.APP_REPLICAS }}
           mariadb_image: "${{ secrets.MARIADB_IMAGE }}"
-          app_image: "ghcr.io/placeholder/placeholder:maintenance"
+          app_image: "ghcr.io/placeholder/placeholder:first_install"
           mariadb_root_password: "${{ secrets.MARIADB_ROOT_PASSWORD }}"
           mariadb_database: "${{ secrets.MARIADB_DATABASE }}"
           mariadb_user: "${{ secrets.MARIADB_USER }}"
           mariadb_password: "${{ secrets.MARIADB_PASSWORD }}"
           EOF
 
-      - name: Run maintenance playbook
+      - name: First install (bootstrap server)
         run: |
           cd ansible
-          ansible-playbook -i inventory.ini maintenance.yml
+          ansible-playbook -i inventory.ini bootstrap.yml
