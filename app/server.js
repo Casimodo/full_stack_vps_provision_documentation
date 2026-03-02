@@ -9,7 +9,7 @@ const DB_USER = process.env.DB_USER || "appuser";
 const DB_PASSWORD = process.env.DB_PASSWORD || "password";
 const DB_NAME = process.env.DB_NAME || "appdb";
 
-app.get("/", (_req, res) => res.type("text/plain").send("Hello World"));
+app.get("/", (_req, res) => res.type("text/plain").send("Hello World v5!"));
 
 app.get("/health/db", async (_req, res) => {
   try {
