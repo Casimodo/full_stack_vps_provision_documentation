@@ -26,12 +26,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set lowercase image name
+        id: vars
+        run: |
+          echo "IMAGE_NAME=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')/demo-app" >> $GITHUB_ENV
+
       - name: Build and push app image
         uses: docker/build-push-action@v6
         with:
           context: ./app
           push: true
-          tags: ghcr.io/${{ github.repository }}/demo-app:${{ github.sha }}
+          tags: ${{ env.IMAGE_NAME }}:${{ github.sha }}
 
       # SSH key for Ansible -> server
       - name: Start ssh-agent
@@ -63,7 +68,7 @@ jobs:
           cat > ansible/group_vars/all.yml <<EOF
           app_domain: "${{ secrets.APP_DOMAIN }}"
           letsencrypt_email: "${{ secrets.LETSENCRYPT_EMAIL }}"
-          app_image: "ghcr.io/${{ github.repository }}/demo-app:${{ github.sha }}"
+          app_image: "${{ env.IMAGE_NAME }}:${{ github.sha }}"
           mariadb_root_password: "${{ secrets.MARIADB_ROOT_PASSWORD }}"
           mariadb_database: "${{ secrets.MARIADB_DATABASE }}"
           mariadb_user: "${{ secrets.MARIADB_USER }}"
