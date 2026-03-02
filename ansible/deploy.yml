@@ -1,0 +1,67 @@
+---
+- name: Deploy demo stack (MariaDB + Node app + Ingress TLS)
+  hosts: servers
+  become: true
+
+  tasks:
+    - name: Create working directory on server
+      ansible.builtin.file:
+        path: /root/demo-deploy
+        state: directory
+        mode: "0755"
+
+    - name: Copy Kubernetes manifests (raw + templates)
+      ansible.builtin.copy:
+        src: ../k8s/
+        dest: /root/demo-deploy/k8s/
+        mode: "0644"
+
+    - name: Render issuer (ClusterIssuer)
+      ansible.builtin.template:
+        src: ../k8s/templates/issuer-letsencrypt.yaml.j2
+        dest: /root/demo-deploy/k8s/issuer-letsencrypt.yaml
+        mode: "0644"
+
+    - name: Render app manifest (image tag injected)
+      ansible.builtin.template:
+        src: ../k8s/templates/app.yaml.j2
+        dest: /root/demo-deploy/k8s/app.yaml
+        mode: "0644"
+
+    - name: Render ingress (domain injected)
+      ansible.builtin.template:
+        src: ../k8s/templates/ingress.yaml.j2
+        dest: /root/demo-deploy/k8s/ingress.yaml
+        mode: "0644"
+
+    - name: Apply namespace
+      ansible.builtin.shell: kubectl apply -f /root/demo-deploy/k8s/namespace.yaml
+
+    - name: Create/Update MariaDB Secret from vars (no clear secrets in repo)
+      ansible.builtin.shell: |
+        kubectl -n demo create secret generic mariadb-secret \
+          --from-literal=MARIADB_ROOT_PASSWORD='{{ mariadb_root_password }}' \
+          --from-literal=MARIADB_DATABASE='{{ mariadb_database }}' \
+          --from-literal=MARIADB_USER='{{ mariadb_user }}' \
+          --from-literal=MARIADB_PASSWORD='{{ mariadb_password }}' \
+          --dry-run=client -o yaml | kubectl apply -f -
+
+    - name: Apply MariaDB (StatefulSet + Service)
+      ansible.builtin.shell: kubectl apply -f /root/demo-deploy/k8s/mariadb.yaml
+
+    - name: Apply cert-manager issuer (ClusterIssuer)
+      ansible.builtin.shell: kubectl apply -f /root/demo-deploy/k8s/issuer-letsencrypt.yaml
+
+    - name: Apply App (Deployment + Service)
+      ansible.builtin.shell: kubectl apply -f /root/demo-deploy/k8s/app.yaml
+
+    - name: Apply Ingress (Traefik + TLS)
+      ansible.builtin.shell: kubectl apply -f /root/demo-deploy/k8s/ingress.yaml
+
+    - name: Show useful commands
+      ansible.builtin.debug:
+        msg:
+          - "Check pods: kubectl -n demo get pods"
+          - "Check ingress: kubectl -n demo get ingress"
+          - "App URL: https://{{ app_domain }}/"
+          - "DB health: https://{{ app_domain }}/health/db"

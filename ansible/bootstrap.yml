@@ -1,0 +1,101 @@
+---
+- name: Bootstrap server for k3s (packages, firewall, k3s, helm, cert-manager)
+  hosts: servers
+  become: true
+
+  vars:
+    # Version helm (peut être ajustée)
+    helm_version: "v3.14.4"
+    cert_manager_namespace: "cert-manager"
+    cert_manager_chart_version: "v1.14.5"
+
+  tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install base packages
+      ansible.builtin.apt:
+        name:
+          - curl
+          - ca-certificates
+          - gnupg
+          - ufw
+          - git
+        state: present
+
+    # --- Firewall (UFW) ---
+    - name: Allow SSH
+      community.general.ufw:
+        rule: allow
+        port: "22"
+        proto: tcp
+
+    - name: Allow HTTP
+      community.general.ufw:
+        rule: allow
+        port: "80"
+        proto: tcp
+
+    - name: Allow HTTPS
+      community.general.ufw:
+        rule: allow
+        port: "443"
+        proto: tcp
+
+    - name: Enable UFW
+      community.general.ufw:
+        state: enabled
+
+    # --- k3s install (Traefik included) ---
+    - name: Install k3s
+      ansible.builtin.shell: |
+        curl -sfL https://get.k3s.io | sh -
+      args:
+        creates: /usr/local/bin/k3s
+
+    - name: Ensure kubectl is available
+      ansible.builtin.shell: |
+        ln -sf /usr/local/bin/k3s /usr/local/bin/kubectl
+      args:
+        creates: /usr/local/bin/kubectl
+
+    - name: Ensure kubeconfig readable for root
+      ansible.builtin.file:
+        path: /etc/rancher/k3s/k3s.yaml
+        mode: "0644"
+
+    # --- helm install ---
+    - name: Install Helm
+      ansible.builtin.shell: |
+        set -e
+        ARCH=$(uname -m)
+        case "$ARCH" in
+          x86_64) ARCH=amd64 ;;
+          aarch64) ARCH=arm64 ;;
+        esac
+        curl -fsSL -o /tmp/helm.tgz https://get.helm.sh/helm-{{ helm_version }}-linux-${ARCH}.tar.gz
+        tar -xzf /tmp/helm.tgz -C /tmp
+        install -m 0755 /tmp/linux-${ARCH}/helm /usr/local/bin/helm
+      args:
+        creates: /usr/local/bin/helm
+
+    # --- cert-manager (for Let's Encrypt) ---
+    - name: Add jetstack helm repo
+      ansible.builtin.shell: |
+        helm repo add jetstack https://charts.jetstack.io
+        helm repo update
+      changed_when: false
+
+    - name: Create cert-manager namespace
+      ansible.builtin.shell: |
+        kubectl get ns {{ cert_manager_namespace }} >/dev/null 2>&1 || kubectl create ns {{ cert_manager_namespace }}
+      changed_when: false
+
+    - name: Install/Upgrade cert-manager
+      ansible.builtin.shell: |
+        helm upgrade --install cert-manager jetstack/cert-manager \
+          --namespace {{ cert_manager_namespace }} \
+          --version {{ cert_manager_chart_version }} \
+          --set installCRDs=true

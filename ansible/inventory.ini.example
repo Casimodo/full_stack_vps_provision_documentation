@@ -1,0 +1,5 @@
+[servers]
+# Remplace par ton IP / user
+# Exemple:
+# 123.123.123.123 ansible_user=root
+IP_DU_SERVEUR ansible_user=root

@@ -1,0 +1,13 @@
+# Copie ce fichier vers: ansible/group_vars/all.yml
+# Puis remplis les valeurs (OU utilise GitHub Secrets côté CI)
+
+app_domain: "app.ton-domaine.com"
+letsencrypt_email: "toi@email.com"
+
+# Image de l'app (en local) - en CI elle sera définie par le workflow
+app_image: "ghcr.io/OWNER/REPO/demo-app:latest"
+
+mariadb_root_password: "change-me"
+mariadb_database: "appdb"
+mariadb_user: "appuser"
+mariadb_password: "change-me"
