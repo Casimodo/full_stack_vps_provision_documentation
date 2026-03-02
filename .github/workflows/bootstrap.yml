@@ -1,51 +1,28 @@
-name: Deploy
+name: Bootstrap
 
 on:
-  push:
-    branches: [ "main" ]
+  workflow_dispatch: {}
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
-  build-and-deploy:
+  bootstrap:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set lowercase image name
-        run: |
-          echo "IMAGE_NAME=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')/demo-app" >> $GITHUB_ENV
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push app image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./app
-          push: true
-          tags: ${{ env.IMAGE_NAME }}:${{ github.sha }}
-
       - name: Start ssh-agent
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Add server to known_hosts (custom port)
+      - name: Add server to known_hosts (initial port 22)
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -p "${{ secrets.SSH_PORT }}" -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -p 22 -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
 
       - name: Install Ansible + deps
         run: |
@@ -53,11 +30,11 @@ jobs:
           sudo apt-get install -y ansible
           ansible-galaxy collection install community.general
 
-      - name: Generate inventory.ini (with SSH port)
+      - name: Generate inventory.ini (initial port 22)
         run: |
           cat > ansible/inventory.ini <<'EOF'
           [servers]
-          ${{ secrets.SSH_HOST }} ansible_user=${{ secrets.SSH_USER }} ansible_port=${{ secrets.SSH_PORT }}
+          ${{ secrets.SSH_HOST }} ansible_user=${{ secrets.SSH_USER }} ansible_port=22
           EOF
 
       - name: Generate group_vars/all.yml from GitHub Secrets
@@ -69,14 +46,14 @@ jobs:
           ssh_port: ${{ secrets.SSH_PORT }}
           app_replicas: ${{ secrets.APP_REPLICAS }}
           mariadb_image: "${{ secrets.MARIADB_IMAGE }}"
-          app_image: "${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          app_image: "ghcr.io/placeholder/placeholder:bootstrap"
           mariadb_root_password: "${{ secrets.MARIADB_ROOT_PASSWORD }}"
           mariadb_database: "${{ secrets.MARIADB_DATABASE }}"
           mariadb_user: "${{ secrets.MARIADB_USER }}"
           mariadb_password: "${{ secrets.MARIADB_PASSWORD }}"
           EOF
 
-      - name: Deploy manifests
+      - name: Bootstrap server
         run: |
           cd ansible
-          ansible-playbook -i inventory.ini deploy.yml
+          ansible-playbook -i inventory.ini bootstrap.yml

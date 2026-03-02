@@ -1,188 +1,145 @@
-# 🚀 k3s + Traefik HTTPS + MariaDB + Node.js (Hello World) — Full Auto with Ansible + GitHub Actions (v2)
+# 🚀 k3s + Traefik HTTPS + MariaDB + Node.js — Ansible + GitHub Actions (Bootstrap / Deploy / Maintenance)
 
-> **Objectif :** serveur OVH vierge ➜ `git push` ➜ déploiement auto (k3s) ➜ HTTPS Let’s Encrypt ➜ app Node “Hello World” + endpoint DB “MariaDB connect: OK”  
-> **Repo public :** aucun secret dans Git, tout passe par **GitHub Secrets**.
+Ce repo est conçu comme **modèle complet** :
+
+1) **Bootstrap (1 fois, manuel)**  
+   - hardening (SSH port, UFW, Fail2ban)  
+   - k3s + helm + cert-manager + k9s  
+2) **Deploy (à chaque push)**  
+   - build/push image app (GHCR)  
+   - rolling update (replicas)  
+   - secrets injectés (repo public safe)  
+3) **Maintenance (au besoin, manuel)**  
+   - **mise à jour sécurité du système** (apt upgrade)  
+   - **exemple de montée de version MariaDB** (changement d’image + apply)  
 
 ---
 
 ## Badges (remplace `OWNER/REPO`)
-
 ![License](https://img.shields.io/github/license/OWNER/REPO)
 ![Release](https://img.shields.io/github/v/release/OWNER/REPO)
 ![Stars](https://img.shields.io/github/stars/OWNER/REPO?style=social)
 ![Forks](https://img.shields.io/github/forks/OWNER/REPO?style=social)
 ![Issues](https://img.shields.io/github/issues/OWNER/REPO)
-![CI](https://img.shields.io/github/actions/workflow/status/OWNER/REPO/deploy.yml?branch=main)
+![Deploy](https://img.shields.io/github/actions/workflow/status/OWNER/REPO/deploy.yml?branch=main)
+![Bootstrap](https://img.shields.io/github/actions/workflow/status/OWNER/REPO/bootstrap.yml?branch=main)
+![Maintenance](https://img.shields.io/github/actions/workflow/status/OWNER/REPO/maintenance.yml?branch=main)
 
 ---
 
-## ✨ Ce que ce repo met en place
+# ✅ Les 3 workflows
 
-### Déploiement
-- k3s (Kubernetes léger) + Traefik (Ingress)
-- cert-manager + Let’s Encrypt (HTTPS automatique)
-- MariaDB (StatefulSet + PVC)
-- Node.js (Hello World + health DB)
+## 1) Bootstrap (manuel)
+GitHub ➜ **Actions ➜ Bootstrap ➜ Run workflow**  
+➡️ Installe la base (k3s + sécurité + cert-manager + k9s).
 
-### Sécurité & admin serveur
-- SSH par **clé** + port SSH configurable (ex: 2022)
-- UFW configuré (ouvre **SSH_PORT**, 80, 443)
-- Fail2ban (protection brute-force SSH)
-- k9s installé sur le serveur (monitoring “kubectl” friendly)
+Fichier : `.github/workflows/bootstrap.yml`
 
-### CI/CD
-- Build & push image Docker sur GHCR
-- Ansible “deploy” applique les manifests et crée les secrets k8s
-- Aucun `kubectl` manuel à faire
+## 2) Deploy (automatique)
+Chaque `push` sur `main` :
+- build/push image app (GHCR)
+- ansible `deploy.yml` (k8s apply + rolling update)
 
----
+Fichier : `.github/workflows/deploy.yml`
 
-# 📦 Arborescence
+## 3) Maintenance (manuel)
+GitHub ➜ **Actions ➜ Maintenance ➜ Run workflow**  
+➡️ Met à jour le système (sécurité) + exemple upgrade MariaDB.
 
-```
-.
-├─ ansible/
-│  ├─ ansible.cfg
-│  ├─ inventory.ini.example
-│  ├─ bootstrap.yml
-│  ├─ deploy.yml
-│  └─ group_vars/all.yml.example
-├─ k8s/
-│  ├─ namespace.yaml
-│  ├─ mariadb.yaml
-│  └─ templates/
-│     ├─ app.yaml.j2
-│     ├─ ingress.yaml.j2
-│     └─ issuer-letsencrypt.yaml.j2
-├─ app/
-│  ├─ Dockerfile
-│  ├─ package.json
-│  └─ server.js
-├─ .github/workflows/
-│  └─ deploy.yml
-├─ LICENSE
-└─ README.md
-```
+Fichier : `.github/workflows/maintenance.yml`
 
 ---
 
-# 0) Pré-requis
-
-## Serveur OVH
-- Ubuntu 22.04/24.04 recommandé
-- Accès SSH initial (souvent `root` + mot de passe OVH)
-
-## Ton PC (Windows)
-- Recommandé : **WSL Ubuntu** (pour gérer les clés SSH et éventuellement lancer Ansible localement)
-- Ensuite : tout peut tourner depuis GitHub Actions
-
----
-
-# 1) Étape unique : installer une clé SSH (et tester)
-
-Dans WSL :
-
-```bash
-ssh-keygen -t ed25519 -C "k3s-ansible"
-ssh-copy-id root@IP_DU_SERVEUR
-ssh -i ~/.ssh/id_ed25519 root@IP_DU_SERVEUR "echo OK"
-```
-
----
-
-# 2) DNS OVH
-
-Zone DNS OVH :
-- record **A** : `app.ton-domaine.com` ➜ `IP_DU_SERVEUR`
-
----
-
-# 3) GitHub Secrets (OBLIGATOIRE — repo public)
+# 🔐 Secrets GitHub (repo public)
 
 GitHub ➜ **Settings ➜ Secrets and variables ➜ Actions ➜ New repository secret**
 
 | Secret | Exemple | Rôle |
 |---|---|---|
 | `SSH_HOST` | `123.123.123.123` | IP serveur |
-| `SSH_USER` | `root` *(ou deployer)* | user SSH |
-| `SSH_PORT` | `2022` | port SSH après hardening |
-| `SSH_PRIVATE_KEY` | contenu `~/.ssh/id_ed25519` | clé privée pour CI |
-| `APP_DOMAIN` | `app.ton-domaine.com` | domaine public |
-| `LETSENCRYPT_EMAIL` | `toi@email.com` | email ACME |
+| `SSH_USER` | `root` | user SSH |
+| `SSH_PORT` | `2022` | port SSH final |
+| `SSH_PRIVATE_KEY` | contenu `~/.ssh/id_ed25519` | clé CI |
+| `APP_DOMAIN` | `app.ton-domaine.com` | domaine |
+| `LETSENCRYPT_EMAIL` | `toi@email.com` | ACME |
+| `APP_REPLICAS` | `2` | nb pods app |
+| `MARIADB_IMAGE` | `mariadb:11` | **image MariaDB** (upgrade) |
 | `MARIADB_ROOT_PASSWORD` | `...` | root DB |
 | `MARIADB_DATABASE` | `appdb` | DB |
 | `MARIADB_USER` | `appuser` | user DB |
 | `MARIADB_PASSWORD` | `...` | mdp user DB |
 
-🔒 **Aucun secret ne doit être committé.**
+> Le secret `MARIADB_IMAGE` te permet de **monter la version** (ex: `mariadb:10.11` ➜ `mariadb:11`).
 
 ---
 
-# 4) Bootstrap (une fois) — inclut SSH port, UFW, Fail2ban, k3s, cert-manager, k9s
+# 🧱 Données MariaDB : comment éviter de perdre tes données ?
 
-## ⚠️ Important : port SSH
-Le playbook va :
-- ouvrir le **nouveau port** dans UFW
-- configurer sshd pour écouter sur ce port (ex: 2022)
-- recharger SSH
-- garder l’accès SSH
+- MariaDB est un **StatefulSet**
+- il crée un **PVC** (volume persistant)
+- un `kubectl apply` ne supprime pas le PVC
 
-👉 Si tu changes `ssh_port`, assure-toi d’avoir ajouté le secret GitHub `SSH_PORT` **et** que ton pare-feu OVH (si tu en utilises un) autorise aussi ce port.
+✅ Les données restent tant que tu ne supprimes pas les PVC / namespace.  
+⚠️ Une **montée de version majeure** (ex: 10 ➜ 11) peut exiger un plan d’upgrade (backup/restore), selon ton usage.
 
-### Exécution locale (optionnelle)
-1) Copie `ansible/inventory.ini.example` ➜ `ansible/inventory.ini` (mettre IP + user + port initial 22)
-2) Copie `ansible/group_vars/all.yml.example` ➜ `ansible/group_vars/all.yml` (mettre domaine, email, ssh_port, etc.)
-3) Lance :
+---
 
+# 🟢 Zéro interruption (site)
+Pour zéro downtime :
+- `APP_REPLICAS >= 2`
+- rolling update `maxUnavailable: 0`
+- readinessProbe OK
+
+Le repo applique ça dans `k8s/templates/app.yaml.j2`.
+
+---
+
+# 🔧 Certificat HTTPS “non valide” (check rapide)
+- Utilise le **domaine** (pas l’IP)
+- Vérifie que le `Certificate` est Ready :
 ```bash
-cd ansible
-ansible-playbook -i inventory.ini bootstrap.yml
+KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl -n demo get ingress,secret,certificate
+```
+- Debug :
+```bash
+KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl -n demo get order,challenge
+KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl -n demo describe certificate
 ```
 
 ---
 
-# 5) Déploiement (à chaque push)
+# 🧰 Maintenance : updates sécurité + upgrade MariaDB
 
-Le workflow :
-1) build/push l’image app sur GHCR
-2) se connecte en SSH (port `SSH_PORT`)
-3) lance Ansible `deploy.yml`
-4) applique manifests (MariaDB + app + ingress TLS)
+## A) Mise à jour système
+Le playbook `ansible/maintenance.yml` :
+- `apt update`
+- `apt upgrade`
+- supprime les paquets inutiles
+- (optionnel) reboot si nécessaire
 
----
+## B) Exemple upgrade MariaDB
+Le même playbook applique :
+- `k8s/mariadb.yaml` en remplaçant l’image par `{{ mariadb_image }}`
+- attend le redémarrage du pod MariaDB
 
-# 6) Vérification
+### ⚠️ Important (upgrade DB)
+Une montée de version MariaDB **peut** demander :
+- backup avant upgrade
+- validation après upgrade
 
-- `https://app.ton-domaine.com/` ➜ `Hello World`
-- `https://app.ton-domaine.com/health/db` ➜ `MariaDB connect: OK`
+Dans un vrai projet :
+- fais un dump avant : `mysqldump`
+- ou utilise une solution de backup (ex: Velero / snapshots)
+
+Ce repo reste volontairement simple, mais montre le **mécanisme complet** d’upgrade via CI/CD.
 
 ---
 
 # 🖥 k9s (sur le serveur)
-
-Après bootstrap, sur le serveur :
-
+Après bootstrap :
 ```bash
 k9s
 ```
-
-k9s utilise le kubeconfig k3s installé à `/root/.kube/config`.
-
----
-
-# 🔐 Sécurité (résumé)
-
-- SSH key only (recommandé) + port custom (ex: 2022)
-- UFW : SSH_PORT / 80 / 443
-- Fail2ban actif sur SSH
-- Secrets uniquement dans GitHub Secrets + Kubernetes Secrets
-
----
-
-# 🗣 English (phrases pro)
-
-- “SSH is only used for the initial bootstrap. After that, deployments are fully automated via Ansible and GitHub Actions.”
-- “We store all sensitive values in GitHub Secrets and inject them at deploy time.”
 
 ---
 

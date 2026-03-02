@@ -1,12 +1,16 @@
-# Copie vers: ansible/group_vars/all.yml
-# (En CI, ce fichier est généré depuis GitHub Secrets)
+# Copie vers: ansible/group_vars/all.yml (local)
+# En CI, ce fichier est généré depuis GitHub Secrets.
+
 app_domain: "app.ton-domaine.com"
 letsencrypt_email: "toi@email.com"
-
-# Port SSH final après hardening (ex: 2022)
 ssh_port: 2022
 
-# Image de l'app (en CI elle est définie par le workflow)
+# HA app
+app_replicas: 2
+
+# Upgrade MariaDB (ex: mariadb:10.11 -> mariadb:11)
+mariadb_image: "mariadb:11"
+
 app_image: "ghcr.io/owner/repo/demo-app:latest"
 
 mariadb_root_password: "change-me"

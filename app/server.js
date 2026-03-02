@@ -9,9 +9,7 @@ const DB_USER = process.env.DB_USER || "appuser";
 const DB_PASSWORD = process.env.DB_PASSWORD || "password";
 const DB_NAME = process.env.DB_NAME || "appdb";
 
-app.get("/", (_req, res) => {
-  res.type("text/plain").send("Hello World");
-});
+app.get("/", (_req, res) => res.type("text/plain").send("Hello World"));
 
 app.get("/health/db", async (_req, res) => {
   try {
@@ -23,10 +21,8 @@ app.get("/health/db", async (_req, res) => {
       database: DB_NAME,
       connectTimeout: 2000,
     });
-
     await conn.ping();
     await conn.end();
-
     res.type("text/plain").send("MariaDB connect: OK");
   } catch (err) {
     res.status(500).type("text/plain").send(`MariaDB connect: ERROR\n${String(err)}`);
@@ -34,6 +30,4 @@ app.get("/health/db", async (_req, res) => {
 });
 
 const port = Number(process.env.PORT || 3000);
-app.listen(port, () => {
-  console.log(`Server listening on :${port}`);
-});
+app.listen(port, () => console.log(`Server listening on :${port}`));

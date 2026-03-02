@@ -22,7 +22,7 @@
         dest: /root/demo-deploy/k8s/issuer-letsencrypt.yaml
         mode: "0644"
 
-    - name: Render app manifest (image tag injected)
+    - name: Render app manifest (replicas + image injected)
       ansible.builtin.template:
         src: ../k8s/templates/app.yaml.j2
         dest: /root/demo-deploy/k8s/app.yaml
@@ -46,23 +46,20 @@
           --from-literal=MARIADB_PASSWORD='{{ mariadb_password }}' \
           --dry-run=client -o yaml | KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f -
 
+    - name: Render MariaDB manifest (image injected)
+      ansible.builtin.template:
+        src: ../k8s/mariadb.yaml
+        dest: /root/demo-deploy/k8s/mariadb.rendered.yaml
+        mode: "0644"
+
     - name: Apply MariaDB (StatefulSet + Service)
-      ansible.builtin.shell: KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f /root/demo-deploy/k8s/mariadb.yaml
+      ansible.builtin.shell: KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f /root/demo-deploy/k8s/mariadb.rendered.yaml
 
     - name: Apply cert-manager issuer (ClusterIssuer)
       ansible.builtin.shell: KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f /root/demo-deploy/k8s/issuer-letsencrypt.yaml
 
-    - name: Apply App (Deployment + Service)
+    - name: Apply App (Deployment + PDB + Service)
       ansible.builtin.shell: KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f /root/demo-deploy/k8s/app.yaml
 
     - name: Apply Ingress (Traefik + TLS)
       ansible.builtin.shell: KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f /root/demo-deploy/k8s/ingress.yaml
-
-    - name: Show useful commands
-      ansible.builtin.debug:
-        msg:
-          - "Check pods: kubectl -n demo get pods"
-          - "Check ingress: kubectl -n demo get ingress"
-          - "k9s: k9s"
-          - "App URL: https://{{ app_domain }}/"
-          - "DB health: https://{{ app_domain }}/health/db"
