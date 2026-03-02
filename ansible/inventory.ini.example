@@ -1,3 +1,2 @@
 [servers]
-# Première connexion (avant changement de port) : 22
 IP_DU_SERVEUR ansible_user=root ansible_port=22

@@ -7,7 +7,6 @@
     helm_version: "v3.14.4"
     cert_manager_namespace: "cert-manager"
     cert_manager_chart_version: "v1.14.5"
-    k9s_version: "v0.32.4"
 
   tasks:
     - name: Update apt cache
@@ -17,13 +16,7 @@
 
     - name: Install base packages
       ansible.builtin.apt:
-        name:
-          - curl
-          - ca-certificates
-          - gnupg
-          - ufw
-          - git
-          - fail2ban
+        name: [curl, ca-certificates, gnupg, ufw, git, fail2ban]
         state: present
 
     - name: Allow SSH (new port)
@@ -53,13 +46,6 @@
         path: /etc/ssh/sshd_config
         regexp: '^#?Port\s+'
         line: "Port {{ ssh_port }}"
-        backup: true
-
-    - name: Ensure PubkeyAuthentication enabled
-      ansible.builtin.lineinfile:
-        path: /etc/ssh/sshd_config
-        regexp: '^#?PubkeyAuthentication\s+'
-        line: "PubkeyAuthentication yes"
         backup: true
 
     - name: Reload SSH service
@@ -124,6 +110,7 @@
         case "$ARCH" in
           x86_64) ARCH=amd64 ;;
           aarch64) ARCH=arm64 ;;
+          *) echo "Unsupported arch: $ARCH" ; exit 1 ;;
         esac
         curl -fsSL -o /tmp/helm.tgz https://get.helm.sh/helm-{{ helm_version }}-linux-${ARCH}.tar.gz
         tar -xzf /tmp/helm.tgz -C /tmp
@@ -131,35 +118,32 @@
       args:
         creates: /usr/local/bin/helm
 
-    - name: Install k9s
+    - name: Install/Update k9s (version from k9s_version)
       ansible.builtin.shell: |
         set -e
         ARCH=$(uname -m)
         case "$ARCH" in
           x86_64) ARCH=amd64 ;;
           aarch64) ARCH=arm64 ;;
+          *) echo "Unsupported arch: $ARCH" ; exit 1 ;;
         esac
-        curl -fsSL -o /tmp/k9s.tgz https://github.com/derailed/k9s/releases/download/v0.32.4/k9s_Linux_${ARCH}.tar.gz
+        VER="{{ k9s_version | default('v0.50.18') }}"
+        curl -fsSL -o /tmp/k9s.tgz "https://github.com/derailed/k9s/releases/download/${VER}/k9s_Linux_${ARCH}.tar.gz"
         tar -xzf /tmp/k9s.tgz -C /tmp k9s
         install -m 0755 /tmp/k9s /usr/local/bin/k9s
-      args:
-        creates: /usr/local/bin/k9s
+        k9s version || true
 
-    - name: Add jetstack helm repo
+    - name: Add jetstack helm repo + update
       ansible.builtin.shell: |
         KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm repo add jetstack https://charts.jetstack.io || true
         KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm repo update
       changed_when: false
 
-    - name: Create cert-manager namespace
+    - name: Create cert-manager namespace (if needed)
       ansible.builtin.shell: |
-        KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl get ns {{ cert_manager_namespace }} >/dev/null 2>&1 || \
-        KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl create ns {{ cert_manager_namespace }}
+        KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl get ns {{ cert_manager_namespace }} >/dev/null 2>&1 ||         KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl create ns {{ cert_manager_namespace }}
       changed_when: false
 
     - name: Install/Upgrade cert-manager
       ansible.builtin.shell: |
-        KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm upgrade --install cert-manager jetstack/cert-manager \
-          --namespace {{ cert_manager_namespace }} \
-          --version {{ cert_manager_chart_version }} \
-          --set installCRDs=true
+        KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm upgrade --install cert-manager jetstack/cert-manager           --namespace {{ cert_manager_namespace }}           --version {{ cert_manager_chart_version }}           --set installCRDs=true

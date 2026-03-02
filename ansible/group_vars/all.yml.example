@@ -3,6 +3,7 @@ letsencrypt_email: "toi@email.com"
 ssh_port: 2022
 app_replicas: 2
 mariadb_image: "mariadb:11"
+k9s_version: "v0.50.18"
 
 app_image: "ghcr.io/owner/repo/demo-app:latest"
 

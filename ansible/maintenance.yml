@@ -1,5 +1,5 @@
 ---
-- name: Maintenance (system security updates + MariaDB image upgrade example)
+- name: Maintenance (system security updates + update k9s + MariaDB upgrade example)
   hosts: servers
   become: true
 
@@ -12,7 +12,7 @@
         update_cache: yes
         cache_valid_time: 3600
 
-    - name: Upgrade packages (security/bugfixes)
+    - name: Upgrade packages
       ansible.builtin.apt:
         upgrade: dist
         autoremove: yes
@@ -25,11 +25,26 @@
 
     - name: Reboot if required (optional)
       ansible.builtin.reboot:
-        msg: "Reboot triggered by maintenance playbook (security updates)"
+        msg: "Reboot triggered by maintenance playbook"
         reboot_timeout: 900
       when: reboot_if_needed and reboot_required.stat.exists
 
-    - name: Render MariaDB manifest (image injected)
+    - name: Install/Update k9s (version from k9s_version)
+      ansible.builtin.shell: |
+        set -e
+        ARCH=$(uname -m)
+        case "$ARCH" in
+          x86_64) ARCH=amd64 ;;
+          aarch64) ARCH=arm64 ;;
+          *) echo "Unsupported arch: $ARCH" ; exit 1 ;;
+        esac
+        VER="{{ k9s_version | default('v0.50.18') }}"
+        curl -fsSL -o /tmp/k9s.tgz "https://github.com/derailed/k9s/releases/download/${VER}/k9s_Linux_${ARCH}.tar.gz"
+        tar -xzf /tmp/k9s.tgz -C /tmp k9s
+        install -m 0755 /tmp/k9s /usr/local/bin/k9s
+        k9s version || true
+
+    - name: Render MariaDB manifest (image injected + default)
       ansible.builtin.template:
         src: ../k8s/mariadb.yaml
         dest: /root/demo-deploy/k8s/mariadb.rendered.yaml
@@ -38,7 +53,6 @@
     - name: Apply MariaDB manifest (upgrade if image changed)
       ansible.builtin.shell: KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f /root/demo-deploy/k8s/mariadb.rendered.yaml
 
-    - name: Wait for MariaDB pod to be Ready after upgrade
-      ansible.builtin.shell: |
-        KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl -n demo wait --for=condition=Ready pod -l app=mariadb --timeout=300s
+    - name: Wait for MariaDB pod Ready
+      ansible.builtin.shell: KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl -n demo wait --for=condition=Ready pod -l app=mariadb --timeout=300s
       changed_when: false

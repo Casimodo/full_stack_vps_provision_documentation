@@ -4,7 +4,7 @@
 Ce repo est un modèle complet pour :
 - **First install (1 fois)** : préparer un serveur OVH vierge (sécurité + k3s + cert-manager + k9s)
 - **Deploy (à chaque push)** : build/push l’image + rolling update (zéro downtime si replicas >= 2)
-- **Maintenance (au besoin)** : mises à jour sécurité OS + exemple d’upgrade MariaDB
+- **Maintenance (au besoin)** : mises à jour sécurité OS + mise à jour k9s + exemple d’upgrade MariaDB
 
 ---
 
@@ -21,6 +21,50 @@ Ce repo est un modèle complet pour :
 
 ---
 
+## 🎯 Objectif final
+
+-   Serveur OVH vierge (accès SSH uniquement)
+-   Push GitHub ➜ déploiement automatique
+-   HTTPS automatique (Traefik + Let's Encrypt)
+-   Base MariaDB
+-   Application Node.js
+-   Mise à jour automatique via CI/CD
+
+------------------------------------------------------------------------
+
+# 🧱 Architecture cible
+
+    GitHub (push)
+        │
+        ▼
+    GitHub Actions (CI/CD)
+        │
+        ▼
+    Serveur OVH
+     ├── k3s
+     ├── Traefik
+     ├── NodeJS App
+     └── MariaDB
+
+------------------------------------------------------------------------
+
+## Installer Ansible
+
+Ubuntu / WSL :
+
+``` bash
+sudo apt update
+sudo apt install ansible -y
+```
+
+Vérifier :
+
+``` bash
+ansible --version
+```
+
+---
+
 # ✅ Les 3 workflows (Actions)
 
 Dans GitHub : **Actions**
@@ -34,7 +78,7 @@ Dans GitHub : **Actions**
 
 3) **Maintenance** (manuel)  
    - fichier : `.github/workflows/maintenance.yml`  
-   - mises à jour système + upgrade MariaDB (exemple)
+   - mises à jour système + **update k9s** + upgrade MariaDB (exemple)
 
 ---
 
@@ -95,84 +139,33 @@ GitHub ➜ **Settings ➜ Secrets and variables ➜ Actions ➜ New repository s
 | `LETSENCRYPT_EMAIL` | `toi@email.com` | email ACME |
 | `APP_REPLICAS` | `2` | nb pods app |
 | `MARIADB_IMAGE` | `mariadb:11` | image MariaDB (upgrade) |
+| `K9S_VERSION` | `v0.50.18` | version k9s |
 | `MARIADB_ROOT_PASSWORD` | `...` | root DB |
 | `MARIADB_DATABASE` | `appdb` | DB |
 | `MARIADB_USER` | `appuser` | user DB |
 | `MARIADB_PASSWORD` | `...` | mdp user DB |
 
-⚠️ **Important :** si `MARIADB_IMAGE` est vide, Kubernetes refusera le StatefulSet (**image required**).  
-Mets au minimum : `mariadb:11`.
-
 ---
 
-# 4) First install (manuel, 1 fois)
 
-Dans GitHub :
-- **Actions ➜ First Install ➜ Run workflow**
+## Étape 3 — Voir les pods
+**Très souvent**, tu ne vois “rien” car :
+- k9s n’utilise pas le bon kubeconfig
+- ou tu es dans le mauvais namespace
 
-Ce workflow :
-- configure UFW + Fail2ban
-- change le port SSH (ex: 2022) et le garde ouvert
-- installe k3s + helm + cert-manager + k9s
-- configure kubeconfig pour root (`/root/.kube/config`)
-
-Après ça, toutes les connexions CI se font sur `SSH_PORT`.
-
----
-
-# 5) Deploy (automatique à chaque push)
-
-À chaque `git push` sur `main` :
-- build/push image app sur GHCR
-- Ansible `deploy.yml` :
-  - crée/maj le secret DB
-  - applique MariaDB (StatefulSet + PVC)
-  - applique l’app (Deployment rolling update + PDB + Service)
-  - applique l’Ingress TLS
-
-✅ Pour **zéro downtime** sur l’app : `APP_REPLICAS >= 2`.
-
----
-
-# 6) Maintenance (manuel)
-
-Dans GitHub :
-- **Actions ➜ Maintenance ➜ Run workflow**
-
-Ça fait :
-- `apt update && apt upgrade` (+ autoremove/autoclean)
-- reboot si nécessaire
-- exemple : upgrade MariaDB via `MARIADB_IMAGE` (puis wait Ready)
-
-⚠️ Une upgrade majeure DB peut nécessiter un plan (backup/restore). Le repo montre le mécanisme CI/CD.
-
----
-
-# 7) Vérifications
-
-## App
-- `https://app.ton-domaine.com/` ➜ `Hello World`
-- `https://app.ton-domaine.com/health/db` ➜ `MariaDB connect: OK`
-
-## Certificat TLS “non valide” (check rapide)
 Sur le serveur :
 ```bash
-KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl -n demo get certificate,secret,ingress
-KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl -n demo describe certificate
-KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl -n demo get order,challenge
+sudo -i
+k9s
 ```
 
-Causes fréquentes :
-- DNS pas propagé / mauvais A record
-- port 80 bloqué (UFW OK mais firewall OVH externe)
-- tu visites l’IP au lieu du domaine
+Dans k9s :
+- `:ns` puis `demo`
+- ou `:ns` puis `all`
 
----
-
-# 🖥 k9s
-Sur le serveur :
+Alternative (forcer kubeconfig) :
 ```bash
-k9s
+KUBECONFIG=/etc/rancher/k3s/k3s.yaml k9s
 ```
 
 ---

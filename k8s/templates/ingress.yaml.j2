@@ -19,6 +19,5 @@ spec:
                 port:
                   number: 80
   tls:
-    - hosts:
-        - "{{ app_domain }}"
+    - hosts: [ "{{ app_domain }}" ]
       secretName: demo-app-tls

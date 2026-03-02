@@ -11,33 +11,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Start ssh-agent
-        uses: webfactory/ssh-agent@v0.9.0
+      - uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Add server to known_hosts (initial port 22)
+      - name: known_hosts (port 22)
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -p 22 -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
 
-      - name: Install Ansible + deps
+      - name: Install Ansible
         run: |
           sudo apt-get update
           sudo apt-get install -y ansible
           ansible-galaxy collection install community.general
 
-      - name: Generate inventory.ini (initial port 22)
+      - name: inventory.ini (port 22)
         run: |
           cat > ansible/inventory.ini <<'EOF'
           [servers]
           ${{ secrets.SSH_HOST }} ansible_user=${{ secrets.SSH_USER }} ansible_port=22
           EOF
 
-      - name: Generate group_vars/all.yml from GitHub Secrets
+      - name: group_vars/all.yml (from secrets)
         run: |
           mkdir -p ansible/group_vars
           cat > ansible/group_vars/all.yml <<EOF
@@ -46,6 +44,7 @@ jobs:
           ssh_port: ${{ secrets.SSH_PORT }}
           app_replicas: ${{ secrets.APP_REPLICAS }}
           mariadb_image: "${{ secrets.MARIADB_IMAGE }}"
+          k9s_version: "${{ secrets.K9S_VERSION }}"
           app_image: "ghcr.io/placeholder/placeholder:first_install"
           mariadb_root_password: "${{ secrets.MARIADB_ROOT_PASSWORD }}"
           mariadb_database: "${{ secrets.MARIADB_DATABASE }}"
@@ -53,7 +52,7 @@ jobs:
           mariadb_password: "${{ secrets.MARIADB_PASSWORD }}"
           EOF
 
-      - name: First install (bootstrap server)
+      - name: Run bootstrap.yml
         run: |
           cd ansible
           ansible-playbook -i inventory.ini bootstrap.yml

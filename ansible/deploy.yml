@@ -46,20 +46,20 @@
           --from-literal=MARIADB_PASSWORD='{{ mariadb_password }}' \
           --dry-run=client -o yaml | KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f -
 
-    - name: Render MariaDB manifest (image injected)
+    - name: Render MariaDB manifest (image injected + default)
       ansible.builtin.template:
         src: ../k8s/mariadb.yaml
         dest: /root/demo-deploy/k8s/mariadb.rendered.yaml
         mode: "0644"
 
-    - name: Apply MariaDB (StatefulSet + Service)
+    - name: Apply MariaDB
       ansible.builtin.shell: KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f /root/demo-deploy/k8s/mariadb.rendered.yaml
 
-    - name: Apply cert-manager issuer (ClusterIssuer)
+    - name: Apply cert-manager issuer
       ansible.builtin.shell: KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f /root/demo-deploy/k8s/issuer-letsencrypt.yaml
 
-    - name: Apply App (Deployment + PDB + Service)
+    - name: Apply App
       ansible.builtin.shell: KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f /root/demo-deploy/k8s/app.yaml
 
-    - name: Apply Ingress (Traefik + TLS)
+    - name: Apply Ingress
       ansible.builtin.shell: KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f /root/demo-deploy/k8s/ingress.yaml
